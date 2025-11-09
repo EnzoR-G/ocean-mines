@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌊 Ocean Mines Game</title>
+<style>
+  body {
+    font-family: "Poppins", sans-serif;
+    background: linear-gradient(to bottom, #001f3f, #003366, #001f3f);
+    color: #e0f7fa;
+    display:flex; flex-direction:column; align-items:center;
+    padding:20px; min-height:100vh; position:relative;
+    overflow:hidden;
+  }
+  h1 { color:#58a6ff; text-shadow:0 0 10px rgba(0,150,255,0.6); }
+
+  #balance { font-size:18px; margin-bottom:15px; }
+  #controls {
+    margin-bottom:10px; display:flex; flex-wrap:wrap; gap:10px;
+    justify-content:center; align-items:center;
+  }
+  input, button {
+    background:rgba(0,40,80,0.6); border:1px solid #58a6ff; color:#fff;
+    padding:8px; border-radius:5px; font-size:14px;
+  }
+  input[type="number"] { width:80px; text-align:center; }
+  button {
+    cursor:pointer; background:#0077b6; border:none;
+    padding:10px 18px; border-radius:6px; transition:background 0.2s, transform 0.1s;
+  }
+  button:hover { background:#0096c7; transform:scale(1.05); }
+
+  /* Bet Buttons */
+  #betControls {
+    display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin-top:5px;
+  }
+  .bet-btn {
+    background:#004d66; border:1px solid #00b4d8; color:white;
+    padding:5px 10px; border-radius:5px; font-size:12px; cursor:pointer;
+    transition: background 0.2s;
+  }
+  .bet-btn:hover { background:#006680; }
+
+  #game { display:grid; gap:8px; margin-top:20px; transition:box-shadow 0.3s ease; }
+  .cell {
+    width:60px; height:60px;
+    background:linear-gradient(145deg, #004d66, #00334d);
+    border:2px solid #00b4d8;
+    box-shadow:0 0 6px rgba(0,180,216,0.4);
+    display:flex; align-items:center; justify-content:center;
+    font-size:26px; cursor:pointer; border-radius:5px;
+    transition:transform 0.2s, background 0.2s, box-shadow 0.3s;
+  }
+  .cell:hover {
+    background:linear-gradient(145deg, #006680, #004466);
+    box-shadow:0 0 10px rgba(0,200,255,0.6);
+    transform:scale(1.05);
+  }
+  .safe {
+    background:linear-gradient(145deg, #00b4d8, #0096c7);
+    box-shadow:0 0 12px rgba(0,200,255,0.8);
+  }
+  .mine {
+    background:linear-gradient(145deg, #c62828, #8e0000);
+    box-shadow:0 0 15px rgba(255,50,50,0.9);
+    animation:shake 0.4s ease;
+  }
+
+  /* Safe tile pop animation */
+  @keyframes popScale {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+  .safe-pop {
+    animation: popScale 0.3s ease forwards;
+    box-shadow: 0 0 15px rgba(0,200,255,0.9);
+  }
+
+  @keyframes shake { 0%,100% { transform:translateX(0); } 25% { transform:translateX(-4px); } 75% { transform:translateX(4px); } }
+  @keyframes fadeUp { from { opacity:0; transform:translate(-50%,20px);} to {opacity:1; transform:translate(-50%,-20px);} }
+  @keyframes flashRed { 0%,100%{ box-shadow:0 0 20px rgba(255,0,0,0.6); } 50%{ box-shadow:0 0 30px rgba(255,0,0,1);} }
+
+  #cashoutSection { margin-top:10px; display:none; text-align:center; }
+  #cashoutSection span { font-weight:bold; color:#58a6ff; }
+  #multiplierBarContainer {
+    width:300px; background:#001f3f; border-radius:5px; overflow:hidden; margin-top:10px;
+  }
+  #multiplierBar { height:20px; width:0%; background:#58a6ff; transition: width 0.3s, background 0.3s; }
+  @keyframes flash { from{opacity:1;} to{opacity:0.5;} }
+</style>
+</head>
+<body>
+
+<h1>🌊 Ocean Mines Game</h1>
+<div id="balance">Balance: 💰 <span id="coins">100.00</span></div>
+
+<div id="controls">
+  <label>Grid Size: <input id="gridSize" type="number" min="3" max="10" value="5"></label>
+  <label>Mines: <input id="mineCount" type="number" min="1" value="5"></label>
+  <div>
+    <label>Bet: <input id="betAmount" type="number" min="0.01" step="0.01" value="10.00"></label>
+    <div id="betControls">
+      <button class="bet-btn" data-action="+0.10">+0.10</button>
+      <button class="bet-btn" data-action="+1">+1</button>
+      <button class="bet-btn" data-action="+10">+10</button>
+      <button class="bet-btn" data-action="half">½</button>
+      <button class="bet-btn" data-action="double">x2</button>
+      <button class="bet-btn" data-action="max">MAX</button>
+    </div>
+  </div>
+  <button id="startGame">Start Game</button>
+</div>
+
+<div id="cashoutSection">
+  <p>Cleared: <span id="clearedCount">0</span> | Potential Win: 💰 <span id="potentialWin">0.00</span></p>
+  <div id="multiplierBarContainer"><div id="multiplierBar"></div></div>
+  <p>Multiplier: <span id="multiplierValue">1.00x</span></p>
+  <button id="cashoutButton">💵 Cash Out</button>
+</div>
+
+<div id="game"></div>
+
+<!-- Sounds -->
+<audio id="clickSound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
+<audio id="mineSound" src="https://actions.google.com/sounds/v1/impacts/crash.ogg"></audio>
+<audio id="winSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+<audio id="safeSound" src="https://actions.google.com/sounds/v1/cartoon/boing.ogg"></audio>
+
+<script>
+let board = [], minePositions = new Set(), gameOver = false;
+let size = 5, mines = 5, balance = 100.00, bet = 10.00, safeRevealed = 0;
+
+const gameDiv = document.getElementById("game");
+const coinsDisplay = document.getElementById("coins");
+const clearedCount = document.getElementById("clearedCount");
+const potentialWin = document.getElementById("potentialWin");
+const cashoutSection = document.getElementById("cashoutSection");
+const multiplierBar = document.getElementById("multiplierBar");
+const multiplierValue = document.getElementById("multiplierValue");
+
+const mineSound = document.getElementById("mineSound");
+const clickSound = document.getElementById("clickSound");
+const winSound = document.getElementById("winSound");
+const safeSound = document.getElementById("safeSound");
+const betInput = document.getElementById("betAmount");
+
+document.getElementById("startGame").addEventListener("click", initGame);
+document.getElementById("cashoutButton").addEventListener("click", cashOut);
+
+// Bet buttons
+document.querySelectorAll(".bet-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const action = btn.dataset.action;
+    let current = parseFloat(betInput.value);
+    if (action.startsWith("+")) current += parseFloat(action);
+    else if (action === "half") current = Math.max(0.01, current / 2);
+    else if (action === "double") current = Math.min(balance, current * 2);
+    else if (action === "max") current = balance;
+    betInput.value = current.toFixed(2);
+  });
+});
+
+function updateBalance() { coinsDisplay.textContent = balance.toFixed(2); }
+
+function initGame() {
+  safeRevealed = 0;
+  cashoutSection.style.display = "block";
+  updateCashoutDisplay();
+
+  size = parseInt(document.getElementById("gridSize").value);
+  mines = parseInt(document.getElementById("mineCount").value);
+  bet = parseFloat(betInput.value);
+
+  if (bet > balance || bet <= 0) return showFloatingMessage("❌ Invalid Bet", "#e63946");
+  if (mines >= size * size) return showFloatingMessage("⚠️ Too Many Mines", "#f4a261");
+
+  balance -= bet;
+  updateBalance();
+
+  board = [];
+  minePositions = new Set();
+  gameOver = false;
+  gameDiv.innerHTML = "";
+
+  while (minePositions.size < mines)
+    minePositions.add(Math.floor(Math.random() * size * size));
+
+  for (let i = 0; i < size * size; i++) {
+    const cell = document.createElement("div");
+    cell.classList.add("cell");
+    cell.dataset.index = i;
+    cell.addEventListener("click", handleClick);
+    board.push(cell);
+    gameDiv.appendChild(cell);
+  }
+
+  gameDiv.style.gridTemplateColumns = `repeat(${size}, 60px)`;
+}
+
+function handleClick(e) {
+  if (gameOver) return;
+  const index = parseInt(e.target.dataset.index);
+  if (minePositions.has(index)) {
+    mineSound.currentTime = 0; mineSound.play();
+    e.target.classList.add("mine");
+    e.target.textContent = "💣";
+    revealMines();
+    gameOver = true;
+    cashoutSection.style.display = "none";
+    gameDiv.style.animation = "flashRed 1s ease";
+    showFloatingMessage("💥 Game Over!", "#ff4d4d");
+  } else {
+    // Safe tile click with sound and pop animation
+    safeSound.currentTime = 0;
+    safeSound.play();
+    e.target.classList.add("safe", "safe-pop");
+    e.target.textContent = "💎";
+    e.target.style.pointerEvents = "none";
+    setTimeout(() => e.target.classList.remove("safe-pop"), 300);
+
+    safeRevealed++;
+    updateCashoutDisplay();
+    checkWin();
+  }
+}
+
+function revealMines() {
+  minePositions.forEach(i => {
+    const cell = board[i];
+    if (!cell.classList.contains("safe")) {
+      cell.classList.add("mine");
+      cell.textContent = "💣";
+    }
+  });
+}
+
+function getMultiplier() {
+  const totalTiles = size * size;
+  const r = safeRevealed;
+  const M = mines;
+  if (r === 0) return 1;
+  let prob = 1;
+  for (let i = 0; i < r; i++) prob *= (totalTiles - M - i) / (totalTiles - i);
+  return 0.99 / prob; // 1% house edge
+}
+
+function getCashoutAmount() { return bet * getMultiplier(); }
+
+function updateCashoutDisplay() {
+  clearedCount.textContent = safeRevealed;
+  const mult = getMultiplier();
+  const winVal = getCashoutAmount();
+  potentialWin.textContent = winVal.toFixed(2);
+  multiplierBar.style.width = Math.min(((mult - 1) / 10) * 100, 100) + "%";
+  multiplierValue.textContent = mult.toFixed(2) + "x";
+}
+
+function cashOut() {
+  if (gameOver || safeRevealed === 0) return;
+  const win = getCashoutAmount();
+  balance += win;
+  updateBalance();
+  revealMines();
+  showFloatingMessage(`💰 +${win.toFixed(2)} coins`, "#2ea043");
+  winSound.play();
+  gameOver = true;
+  cashoutSection.style.display = "none";
+}
+
+function checkWin() {
+  if (safeRevealed === size * size - mines) {
+    const win = getCashoutAmount();
+    balance += win;
+    updateBalance();
+    revealMines();
+    showFloatingMessage(`🎉 All Cleared! +${win.toFixed(2)} coins`, "#2ea043");
+    winSound.play();
+    gameOver = true;
+    cashoutSection.style.display = "none";
+  }
+}
+
+function showFloatingMessage(msg, color) {
+  const msgEl = document.createElement("div");
+  msgEl.textContent = msg;
+  msgEl.style.position = "absolute";
+  msgEl.style.top = "20px";
+  msgEl.style.left = "50%";
+  msgEl.style.transform = "translateX(-50%)";
+  msgEl.style.fontSize = "22px";
+  msgEl.style.color = color;
+  msgEl.style.animation = "fadeUp 1s ease forwards";
+  document.body.appendChild(msgEl);
+  setTimeout(() => msgEl.remove(), 1200);
+}
+</script>
+
+</body>
+</html>
